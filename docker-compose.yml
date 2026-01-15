@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: pdf-chatbot-postgres
     environment:
       POSTGRES_DB: pdfchatbot
@@ -21,7 +21,7 @@ services:
       retries: 5
 
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.4.15
     container_name: pdf-chatbot-chroma
     ports:
       - "8000:8000"
@@ -30,6 +30,8 @@ services:
     environment:
       - ANONYMIZED_TELEMETRY=False
       - ALLOW_RESET=True
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
     networks:
       - chatbot-network
     healthcheck:

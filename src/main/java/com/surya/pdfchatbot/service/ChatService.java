@@ -11,7 +11,6 @@ import com.surya.pdfchatbot.repository.DocumentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -115,10 +114,12 @@ public class ChatService {
                     .build();
 
             // Search for similar chunks
-            SearchRequest searchRequest = SearchRequest.query(question)
-                    .withTopK(ragConfig.getTopK())
-                    .withSimilarityThreshold(ragConfig.getSimilarityThreshold())
-                    .withFilterExpression(filterExpression);
+            SearchRequest searchRequest = SearchRequest.builder()
+                    .query(question)
+                    .topK(ragConfig.getTopK())
+                    .similarityThreshold(ragConfig.getSimilarityThreshold())
+                    .filterExpression(filterExpression)
+                    .build();
 
             List<org.springframework.ai.document.Document> results = vectorStore.similaritySearch(searchRequest);
 
@@ -126,7 +127,7 @@ public class ChatService {
             for (org.springframework.ai.document.Document doc : results) {
                 Map<String, Object> metadata = doc.getMetadata();
                 chunks.add(new RetrievedChunk(
-                        doc.getContent(),
+                        doc.getText(),
                         (Integer) metadata.get("pageNumber"),
                         (Integer) metadata.get("chunkIndex"),
                         0.85 // Default similarity - actual score might not be available

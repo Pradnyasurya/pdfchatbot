@@ -29,28 +29,42 @@ public class EmbeddingService {
      */
     public void storeDocumentChunks(String documentId, List<ChunkingService.TextChunk> chunks) {
         try {
-            List<Document> documents = new ArrayList<>();
-
-            for (ChunkingService.TextChunk chunk : chunks) {
-                Map<String, Object> metadata = new HashMap<>();
-                metadata.put("documentId", documentId);
-                metadata.put("pageNumber", chunk.pageNumber());
-                metadata.put("chunkIndex", chunk.chunkIndex());
-                metadata.put("startPosition", chunk.startPosition());
-                metadata.put("endPosition", chunk.endPosition());
-
-                Document document = new Document(
-                        chunk.content(),
-                        metadata
-                );
+            int batchSize = 10; // Process 10 chunks at a time for better memory management
+            int totalChunks = chunks.size();
+            
+            log.info("Starting to store {} chunks for document {} in batches of {}", totalChunks, documentId, batchSize);
+            
+            for (int i = 0; i < totalChunks; i += batchSize) {
+                int endIndex = Math.min(i + batchSize, totalChunks);
+                List<ChunkingService.TextChunk> batch = chunks.subList(i, endIndex);
                 
-                documents.add(document);
+                List<Document> documents = new ArrayList<>();
+                for (ChunkingService.TextChunk chunk : batch) {
+                    Map<String, Object> metadata = new HashMap<>();
+                    metadata.put("documentId", documentId);
+                    metadata.put("pageNumber", chunk.pageNumber());
+                    metadata.put("chunkIndex", chunk.chunkIndex());
+                    metadata.put("startPosition", chunk.startPosition());
+                    metadata.put("endPosition", chunk.endPosition());
+
+                    Document document = new Document(
+                            chunk.content(),
+                            metadata
+                    );
+                    
+                    documents.add(document);
+                }
+
+                // Store batch in vector store
+                vectorStore.add(documents);
+                log.info("Stored batch {}/{} ({} chunks) for document {}", 
+                        (i/batchSize) + 1, (totalChunks + batchSize - 1)/batchSize, documents.size(), documentId);
+                
+                // Allow GC to clean up
+                documents.clear();
             }
 
-            // Store all documents in vector store
-            vectorStore.add(documents);
-
-            log.info("Stored {} chunks for document {} in vector store", chunks.size(), documentId);
+            log.info("Successfully stored {} chunks for document {} in vector store", totalChunks, documentId);
 
         } catch (Exception e) {
             throw new DocumentProcessingException("Failed to store embeddings for document: " + documentId, e);

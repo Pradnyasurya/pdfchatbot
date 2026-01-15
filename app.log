@@ -1,0 +1,72 @@
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.0)
+
+2026-01-15T13:46:27.256+05:30  INFO 51651 --- [pdf-chatbot] [           main] c.s.pdfchatbot.PdfChatbotApplication     : Starting PdfChatbotApplication v0.0.1-SNAPSHOT using Java 21.0.9 with PID 51651 (/home/pkurane/projects/new1/pdf-chatbot/target/pdfchatbot-0.0.1-SNAPSHOT.jar started by pkurane in /home/pkurane/projects/new1/pdf-chatbot)
+2026-01-15T13:46:27.257+05:30 DEBUG 51651 --- [pdf-chatbot] [           main] c.s.pdfchatbot.PdfChatbotApplication     : Running with Spring Boot v3.5.0, Spring v6.2.7
+2026-01-15T13:46:27.257+05:30  INFO 51651 --- [pdf-chatbot] [           main] c.s.pdfchatbot.PdfChatbotApplication     : No active profile set, falling back to 1 default profile: "default"
+2026-01-15T13:46:27.696+05:30  INFO 51651 --- [pdf-chatbot] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-15T13:46:27.776+05:30  INFO 51651 --- [pdf-chatbot] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 74 ms. Found 1 JPA repository interface.
+2026-01-15T13:46:28.054+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-01-15T13:46:28.064+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-15T13:46:28.064+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.41]
+2026-01-15T13:46:28.082+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-15T13:46:28.084+05:30  INFO 51651 --- [pdf-chatbot] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 802 ms
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+2026-01-15T13:46:28.234+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-15T13:46:28.272+05:30  INFO 51651 --- [pdf-chatbot] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.15.Final
+2026-01-15T13:46:28.291+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-01-15T13:46:28.437+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-15T13:46:28.452+05:30  INFO 51651 --- [pdf-chatbot] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-01-15T13:46:28.555+05:30  INFO 51651 --- [pdf-chatbot] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@43fd77d8
+2026-01-15T13:46:28.555+05:30  INFO 51651 --- [pdf-chatbot] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-01-15T13:46:28.570+05:30  WARN 51651 --- [pdf-chatbot] [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-15T13:46:28.580+05:30  INFO 51651 --- [pdf-chatbot] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 16.11
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-01-15T13:46:28.952+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-15T13:46:28.978+05:30  INFO 51651 --- [pdf-chatbot] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-15T13:46:29.212+05:30 DEBUG 51651 --- [pdf-chatbot] [           main] o.s.a.m.t.a.ToolCallingAutoConfiguration : Cannot load class: org.springframework.security.oauth2.client.ClientAuthorizationException
+2026-01-15T13:46:29.352+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.s.a.v.pgvector.PgVectorStore           : Using the vector table name: vector_store. Is empty: false
+2026-01-15T13:46:29.354+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.s.a.v.pgvector.PgVectorStore           : Initializing PGVectorStore schema for table: vector_store in schema: public
+2026-01-15T13:46:29.354+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.s.a.v.pgvector.PgVectorStore           : vectorTableValidationsEnabled false
+2026-01-15T13:46:29.536+05:30  WARN 51651 --- [pdf-chatbot] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-15T13:46:29.743+05:30  INFO 51651 --- [pdf-chatbot] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-01-15T13:46:29.749+05:30  INFO 51651 --- [pdf-chatbot] [           main] c.s.pdfchatbot.PdfChatbotApplication     : Started PdfChatbotApplication in 2.757 seconds (process running for 3.046)
+2026-01-15T13:46:51.739+05:30  INFO 51651 --- [pdf-chatbot] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-01-15T13:46:51.739+05:30  INFO 51651 --- [pdf-chatbot] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-01-15T13:46:51.740+05:30  INFO 51651 --- [pdf-chatbot] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-01-15T13:46:51.776+05:30  INFO 51651 --- [pdf-chatbot] [nio-8080-exec-1] c.s.p.controller.DocumentController      : Received document upload request: drawing_manual.pdf
+2026-01-15T13:46:51.781+05:30  INFO 51651 --- [pdf-chatbot] [nio-8080-exec-1] c.s.p.service.FileStorageService         : Stored file: drawing_manual.pdf with document ID: b4b1860e-c18d-441e-974c-a043b3d01c8d
+2026-01-15T13:46:51.795+05:30 DEBUG 51651 --- [pdf-chatbot] [nio-8080-exec-1] org.hibernate.SQL                        : 
+    select
+        d1_0.id,
+        d1_0.chunk_count,
+        d1_0.created_at,
+        d1_0.error_message,
+        d1_0.file_path,
+        d1_0.file_size,
+        d1_0.filename,
+        d1_0.original_filename,
+        d1_0.page_count,
+        d1_0.processing_status,
+        d1_0.updated_at,
+        d1_0.upload_date 
+    from
+        documents d1_0 
+    where
+        d1_0.id=?
+2026-01-15T13:46:51.814+05:30  INFO 51651 --- [pdf-chatbot] [nio-8080-exec-1] c.s.pdfchatbot.service.DocumentService   : Starting processing for document: b4b1860e-c18d-441e-974c-a043b3d01c8d
+2026-01-15T13:46:52.144+05:30  INFO 51651 --- [pdf-chatbot] [nio-8080-exec-1] c.s.p.service.PdfProcessingService       : Extracted text from 36 pages
