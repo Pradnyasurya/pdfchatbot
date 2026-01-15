@@ -35,10 +35,16 @@ public class ChunkingService {
         int chunkSize = ragConfig.getChunkSize();
         int overlap = ragConfig.getChunkOverlap();
         
+        log.info("Chunking text of length {} for page {} with chunkSize={}, overlap={}", 
+                text.length(), pageNumber, chunkSize, overlap);
+        
         int position = 0;
         int chunkIndex = 0;
+        int maxIterations = (text.length() / Math.max(1, chunkSize - overlap)) + 10; // Safety limit
+        int iterations = 0;
 
-        while (position < text.length()) {
+        while (position < text.length() && iterations < maxIterations) {
+            iterations++;
             int endPosition = Math.min(position + chunkSize, text.length());
             
             // Try to find a sentence boundary near the end position
@@ -58,13 +64,17 @@ public class ChunkingService {
                 chunkIndex++;
             }
 
-            // Move position forward, accounting for overlap
-            position = endPosition - overlap;
-            
-            // Ensure we're making progress
-            if (position <= endPosition - chunkSize + overlap) {
-                position = endPosition - overlap;
+            // Move position forward, ensuring we always make progress
+            int newPosition = endPosition - overlap;
+            if (newPosition <= position) {
+                // Avoid infinite loop - force progress
+                newPosition = position + 1;
             }
+            position = newPosition;
+        }
+        
+        if (iterations >= maxIterations) {
+            log.warn("Chunking hit max iterations limit for page {}", pageNumber);
         }
 
         log.debug("Created {} chunks from page {}", chunks.size(), pageNumber);

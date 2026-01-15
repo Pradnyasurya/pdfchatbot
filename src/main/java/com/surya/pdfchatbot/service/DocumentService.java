@@ -9,12 +9,12 @@ import com.surya.pdfchatbot.model.entity.Document;
 import com.surya.pdfchatbot.repository.DocumentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -27,21 +27,18 @@ public class DocumentService {
 
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
-    private final PdfProcessingService pdfProcessingService;
-    private final ChunkingService chunkingService;
     private final EmbeddingService embeddingService;
+    private final DocumentProcessingService documentProcessingService;
 
     public DocumentService(
             DocumentRepository documentRepository,
             FileStorageService fileStorageService,
-            PdfProcessingService pdfProcessingService,
-            ChunkingService chunkingService,
-            EmbeddingService embeddingService) {
+            EmbeddingService embeddingService,
+            DocumentProcessingService documentProcessingService) {
         this.documentRepository = documentRepository;
         this.fileStorageService = fileStorageService;
-        this.pdfProcessingService = pdfProcessingService;
-        this.chunkingService = chunkingService;
         this.embeddingService = embeddingService;
+        this.documentProcessingService = documentProcessingService;
     }
 
     /**
@@ -67,8 +64,15 @@ public class DocumentService {
 
         documentRepository.save(document);
 
-        // Process document asynchronously
-        processDocumentAsync(document.getId());
+        // Schedule async processing to start AFTER the transaction commits
+        // This ensures the document is visible in the database when the async method runs
+        String documentId = document.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                documentProcessingService.processDocumentAsync(documentId);
+            }
+        });
 
         return new DocumentUploadResponse(
                 document.getId(),
@@ -77,44 +81,6 @@ public class DocumentService {
                 "Document uploaded successfully and is being processed",
                 document.getUploadDate()
         );
-    }
-
-    /**
-     * Process document asynchronously
-     */
-    @Async
-    public void processDocumentAsync(String documentId) {
-        Document document = documentRepository.findById(documentId)
-                .orElseThrow(() -> new DocumentNotFoundException("Document not found: " + documentId));
-
-        try {
-            log.info("Starting processing for document: {}", documentId);
-
-            // Extract text from PDF
-            PdfProcessingService.PdfContent pdfContent = pdfProcessingService.extractText(document.getFilePath());
-            document.setPageCount(pdfContent.pageCount());
-
-            // Chunk the text
-            List<ChunkingService.TextChunk> chunks = chunkingService.chunkDocument(pdfContent);
-            document.setChunkCount(chunks.size());
-
-            // Generate and store embeddings
-            embeddingService.storeDocumentChunks(documentId, chunks);
-
-            // Mark as ready
-            document.setProcessingStatus(Document.ProcessingStatus.READY);
-            document.setErrorMessage(null);
-
-            log.info("Successfully processed document: {} with {} pages and {} chunks",
-                    documentId, pdfContent.pageCount(), chunks.size());
-
-        } catch (Exception e) {
-            log.error("Failed to process document: {}", documentId, e);
-            document.setProcessingStatus(Document.ProcessingStatus.FAILED);
-            document.setErrorMessage("Processing failed: " + e.getMessage());
-        } finally {
-            documentRepository.save(document);
-        }
     }
 
     /**

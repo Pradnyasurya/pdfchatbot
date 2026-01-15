@@ -32,3 +32,8 @@ build/
 ### VS Code ###
 .vscode/
 uploads/
+
+# Environment files
+.env
+.env.local
+app.log
