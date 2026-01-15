@@ -60,6 +60,11 @@ public class EmbeddingService {
                 log.info("Stored batch {}/{} ({} chunks) for document {}", 
                         (i/batchSize) + 1, (totalChunks + batchSize - 1)/batchSize, documents.size(), documentId);
                 
+                // Log first chunk metadata for debugging
+                if (i == 0 && !documents.isEmpty()) {
+                    log.debug("Sample chunk metadata: {}", documents.get(0).getMetadata());
+                }
+                
                 // Allow GC to clean up
                 documents.clear();
             }

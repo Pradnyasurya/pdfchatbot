@@ -113,6 +113,21 @@ public class ChatService {
                     .eq("documentId", documentId)
                     .build();
 
+            log.debug("Searching for chunks with documentId={}, topK={}, threshold={}", 
+                    documentId, ragConfig.getTopK(), ragConfig.getSimilarityThreshold());
+
+            // Debug: First try without filter to see if ANY chunks exist
+            SearchRequest debugRequest = SearchRequest.builder()
+                    .query(question)
+                    .topK(5)
+                    .similarityThreshold(0.0)
+                    .build();
+            List<org.springframework.ai.document.Document> debugResults = vectorStore.similaritySearch(debugRequest);
+            log.debug("DEBUG: Vector store contains {} total chunks (unfiltered search)", debugResults.size());
+            if (!debugResults.isEmpty()) {
+                log.debug("DEBUG: First chunk metadata: {}", debugResults.get(0).getMetadata());
+            }
+
             // Search for similar chunks
             SearchRequest searchRequest = SearchRequest.builder()
                     .query(question)
@@ -122,10 +137,13 @@ public class ChatService {
                     .build();
 
             List<org.springframework.ai.document.Document> results = vectorStore.similaritySearch(searchRequest);
+            
+            log.debug("Vector store returned {} results", results.size());
 
             List<RetrievedChunk> chunks = new ArrayList<>();
             for (org.springframework.ai.document.Document doc : results) {
                 Map<String, Object> metadata = doc.getMetadata();
+                log.debug("Chunk metadata: {}", metadata);
                 chunks.add(new RetrievedChunk(
                         doc.getText(),
                         (Integer) metadata.get("pageNumber"),
