@@ -12,40 +12,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - chatbot-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U chatbot -d pdfchatbot"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
-
-  chroma:
-    image: chromadb/chroma:0.4.15
-    container_name: pdf-chatbot-chroma
-    ports:
-      - "8000:8000"
-    volumes:
-      - chroma_data:/chroma/chroma
-    environment:
-      - ANONYMIZED_TELEMETRY=False
-      - ALLOW_RESET=True
-      - IS_PERSISTENT=TRUE
-      - PERSIST_DIRECTORY=/chroma/chroma
-    networks:
-      - chatbot-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      retries: 10
 
 volumes:
   postgres_data:
     driver: local
-  chroma_data:
-    driver: local
-
-networks:
-  chatbot-network:
-    driver: bridge
