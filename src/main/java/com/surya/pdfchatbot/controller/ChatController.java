@@ -27,11 +27,11 @@ public class ChatController {
     @PostMapping
     public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
         log.info("Received chat request for document: {} with question: {}",
-                request.getDocumentId(), request.getQuestion());
+                request.documentId(), request.question());
         
         ChatResponse response = chatService.chat(request);
         
-        log.info("Generated response in {} format", request.getResponseFormat());
+        log.info("Generated response in {} format", request.responseFormat());
         
         return ResponseEntity.ok(response);
     }
