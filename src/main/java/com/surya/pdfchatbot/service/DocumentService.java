@@ -15,6 +15,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -162,6 +164,31 @@ public class DocumentService {
         long maxSize = 50 * 1024 * 1024; // 50 MB
         if (file.getSize() > maxSize) {
             throw new InvalidDocumentException("File size exceeds maximum limit of 50MB");
+        }
+
+        // Validate PDF magic bytes (%PDF-)
+        validatePdfContent(file);
+    }
+
+    /**
+     * Validate that the file content is actually a PDF by checking magic bytes
+     */
+    private void validatePdfContent(MultipartFile file) {
+        try (InputStream is = file.getInputStream()) {
+            byte[] header = new byte[5];
+            int bytesRead = is.read(header);
+            
+            if (bytesRead < 5) {
+                throw new InvalidDocumentException("File is too small to be a valid PDF");
+            }
+            
+            // PDF files start with "%PDF-"
+            String headerStr = new String(header);
+            if (!headerStr.equals("%PDF-")) {
+                throw new InvalidDocumentException("Invalid PDF file: file does not have valid PDF header. Please upload a valid PDF document.");
+            }
+        } catch (IOException e) {
+            throw new InvalidDocumentException("Failed to read file content: " + e.getMessage());
         }
     }
 
