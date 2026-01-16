@@ -61,8 +61,8 @@ public class ChatService {
      */
     public ChatResponse chat(ChatRequest request) {
         // Validate document exists and is ready
-        Document document = documentRepository.findById(request.getDocumentId())
-                .orElseThrow(() -> new DocumentNotFoundException("Document not found: " + request.getDocumentId()));
+        Document document = documentRepository.findById(request.documentId())
+                .orElseThrow(() -> new DocumentNotFoundException("Document not found: " + request.documentId()));
 
         if (document.getProcessingStatus() != Document.ProcessingStatus.READY) {
             throw new DocumentProcessingException("Document is not ready for querying. Status: " + 
@@ -72,15 +72,15 @@ public class ChatService {
         try {
             // Retrieve relevant chunks using vector similarity search
             List<RetrievedChunk> relevantChunks = retrieveRelevantChunks(
-                    request.getDocumentId(),
-                    request.getQuestion()
+                    request.documentId(),
+                    request.question()
             );
 
             if (relevantChunks.isEmpty()) {
-                return createResponse(
+                return new ChatResponse(
                         "I cannot find relevant information in the document to answer your question.",
-                        request.getResponseFormat().toString(),
-                        request.getDocumentId(),
+                        request.responseFormat().toString(),
+                        request.documentId(),
                         List.of()
                 );
             }
@@ -89,13 +89,13 @@ public class ChatService {
             String context = buildContext(relevantChunks);
 
             // Generate answer using LLM
-            String answer = generateAnswer(request.getQuestion(), context);
+            String answer = generateAnswer(request.question(), context);
 
             // Prepare sources for JSON response
-            List<SourceReference> sources = request.getResponseFormat() == ChatRequest.ResponseFormat.JSON ?
+            List<SourceReference> sources = request.responseFormat() == ChatRequest.ResponseFormat.JSON ?
                     buildSourceReferences(relevantChunks) : null;
 
-            return createResponse(answer, request.getResponseFormat().toString(), request.getDocumentId(), sources);
+            return new ChatResponse(answer, request.responseFormat().toString(), request.documentId(), sources);
 
         } catch (Exception e) {
             log.error("Error processing chat request", e);
@@ -216,18 +216,6 @@ public class ChatService {
                         chunk.relevanceScore()
                 ))
                 .toList();
-    }
-
-    /**
-     * Create chat response
-     */
-    private ChatResponse createResponse(String answer, String format, String documentId, List<SourceReference> sources) {
-        ChatResponse response = new ChatResponse();
-        response.setAnswer(answer);
-        response.setFormat(format);
-        response.setDocumentId(documentId);
-        response.setSources(sources);
-        return response;
     }
 
     /**
