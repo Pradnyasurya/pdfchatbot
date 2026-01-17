@@ -525,9 +525,12 @@ function addMessage(content, role, sources = null) {
         `;
     }
     
+    // Use parseMarkdown for assistant messages, escapeHtml for user messages
+    const formattedContent = role === 'assistant' ? parseMarkdown(content) : escapeHtml(content);
+    
     message.innerHTML = `
         <div class="message-content">
-            ${escapeHtml(content)}
+            ${formattedContent}
             ${sourcesHtml}
         </div>
     `;
@@ -574,6 +577,54 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/**
+ * Parse markdown-like text to HTML
+ * Supports: **bold**, *italic*, newlines, code blocks, inline code, lists
+ */
+function parseMarkdown(text) {
+    if (!text) return '';
+    
+    // Escape HTML first to prevent XSS
+    let html = escapeHtml(text);
+    
+    // Code blocks (```code```)
+    html = html.replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>');
+    
+    // Inline code (`code`)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Bold (**text** or __text__)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    
+    // Italic (*text* or _text_)
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+    
+    // Strikethrough (~~text~~)
+    html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    
+    // Links [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    
+    // Convert newlines to <br>
+    html = html.replace(/\n/g, '<br>');
+    
+    // Unordered lists (lines starting with - or *)
+    html = html.replace(/^[\-\*]\s+(.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    
+    // Ordered lists (lines starting with numbers)
+    html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+    
+    // Headers
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    
+    return html;
 }
 
 // ===== Initialization =====
