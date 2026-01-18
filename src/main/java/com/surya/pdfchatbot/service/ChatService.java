@@ -10,7 +10,6 @@ import com.surya.pdfchatbot.model.entity.Document;
 import com.surya.pdfchatbot.repository.DocumentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -40,17 +39,17 @@ public class ChatService {
             When you provide an answer, reference the page numbers like this: (Page X).
             """;
 
-    private final ChatClient chatClient;
+    private final MultiModelChatService multiModelChatService;
     private final VectorStore vectorStore;
     private final DocumentRepository documentRepository;
     private final RagConfig ragConfig;
 
     public ChatService(
-            ChatClient.Builder chatClientBuilder,
+            MultiModelChatService multiModelChatService,
             VectorStore vectorStore,
             DocumentRepository documentRepository,
             RagConfig ragConfig) {
-        this.chatClient = chatClientBuilder.build();
+        this.multiModelChatService = multiModelChatService;
         this.vectorStore = vectorStore;
         this.documentRepository = documentRepository;
         this.ragConfig = ragConfig;
@@ -178,7 +177,7 @@ public class ChatService {
     }
 
     /**
-     * Generate answer using LLM with RAG context
+     * Generate answer using LLM with RAG context (with multi-model fallback support)
      */
     private String generateAnswer(String question, String context) {
         String promptText = """
@@ -197,12 +196,13 @@ public class ChatService {
         promptTemplate.add("context", context);
         promptTemplate.add("question", question);
 
-        String response = chatClient.prompt()
-                .user(promptTemplate.render())
-                .call()
-                .content();
-
-        return response != null ? response.trim() : "Unable to generate answer.";
+        try {
+            String response = multiModelChatService.chat(promptTemplate.render());
+            return response != null ? response.trim() : "Unable to generate answer.";
+        } catch (MultiModelChatService.ModelUnavailableException e) {
+            log.error("All AI models failed to generate response", e);
+            throw new DocumentProcessingException("Failed to generate answer: " + e.getMessage(), e);
+        }
     }
 
     /**

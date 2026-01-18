@@ -1,5 +1,6 @@
 package com.surya.pdfchatbot.exception;
 
+import com.surya.pdfchatbot.service.MultiModelChatService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -32,6 +33,16 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now()
         );
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(MultiModelChatService.ModelUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleModelUnavailableException(MultiModelChatService.ModelUnavailableException ex) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "AI service unavailable: " + ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(error, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     @ExceptionHandler(StorageException.class)
