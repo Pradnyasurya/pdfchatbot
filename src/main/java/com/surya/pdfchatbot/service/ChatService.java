@@ -143,10 +143,15 @@ public class ChatService {
             for (org.springframework.ai.document.Document doc : results) {
                 Map<String, Object> metadata = doc.getMetadata();
                 log.debug("Chunk metadata: {}", metadata);
+                
+                // Safely extract metadata with null checks
+                Integer pageNumber = metadata != null ? (Integer) metadata.get("pageNumber") : null;
+                Integer chunkIndex = metadata != null ? (Integer) metadata.get("chunkIndex") : null;
+                
                 chunks.add(new RetrievedChunk(
                         doc.getText(),
-                        (Integer) metadata.get("pageNumber"),
-                        (Integer) metadata.get("chunkIndex"),
+                        pageNumber != null ? pageNumber : 0,
+                        chunkIndex != null ? chunkIndex : 0,
                         0.85 // Default similarity - actual score might not be available
                 ));
             }
@@ -210,11 +215,17 @@ public class ChatService {
      */
     private List<SourceReference> buildSourceReferences(List<RetrievedChunk> chunks) {
         return chunks.stream()
-                .map(chunk -> new SourceReference(
-                        chunk.pageNumber(),
-                        chunk.content().substring(0, Math.min(chunk.content().length(), 200)) + "...",
-                        chunk.relevanceScore()
-                ))
+                .map(chunk -> {
+                    String content = chunk.content();
+                    String truncatedContent = content.length() > 200 
+                            ? content.substring(0, 200) + "..." 
+                            : content;
+                    return new SourceReference(
+                            chunk.pageNumber(),
+                            truncatedContent,
+                            chunk.relevanceScore()
+                    );
+                })
                 .toList();
     }
 
