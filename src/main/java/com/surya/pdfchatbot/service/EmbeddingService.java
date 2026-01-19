@@ -4,8 +4,9 @@ import com.surya.pdfchatbot.exception.DocumentProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.document.MetadataMode;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -81,11 +82,46 @@ public class EmbeddingService {
      */
     public void deleteDocumentChunks(String documentId) {
         try {
-            // Note: ChromaDB will need to filter by documentId metadata to delete
-            // This might require custom implementation based on vector store capabilities
-            log.info("Deleted chunks for document {} from vector store", documentId);
+            log.info("Deleting chunks for document {} from vector store", documentId);
+            
+            // Create filter to find all chunks belonging to this document
+            var filterExpression = new FilterExpressionBuilder()
+                    .eq("documentId", documentId)
+                    .build();
+            
+            // Search for all chunks with this documentId to get their IDs
+            SearchRequest searchRequest = SearchRequest.builder()
+                    .query("*")
+                    .topK(1000) // Get up to 1000 chunks per document
+                    .similarityThreshold(0.0) // Accept all matches
+                    .filterExpression(filterExpression)
+                    .build();
+            
+            List<Document> documentsToDelete = vectorStore.similaritySearch(searchRequest);
+            
+            if (documentsToDelete.isEmpty()) {
+                log.info("No chunks found for document {} in vector store", documentId);
+                return;
+            }
+            
+            // Extract document IDs and delete them
+            List<String> idsToDelete = documentsToDelete.stream()
+                    .map(Document::getId)
+                    .filter(id -> id != null && !id.isEmpty())
+                    .toList();
+            
+            if (!idsToDelete.isEmpty()) {
+                vectorStore.delete(idsToDelete);
+                log.info("Successfully deleted {} chunks for document {} from vector store", 
+                        idsToDelete.size(), documentId);
+            } else {
+                log.warn("Found {} chunks but could not extract IDs for deletion for document {}", 
+                        documentsToDelete.size(), documentId);
+            }
+            
         } catch (Exception e) {
             log.error("Failed to delete embeddings for document: {}", documentId, e);
+            throw new DocumentProcessingException("Failed to delete document chunks from vector store: " + documentId, e);
         }
     }
 
