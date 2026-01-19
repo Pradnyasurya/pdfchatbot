@@ -1,58 +1,67 @@
 # Spring AI PDF Chatbot with RAG
 
-A production-ready Spring Boot application that enables intelligent question-answering on PDF documents using Retrieval-Augmented Generation (RAG) with OpenAI and ChromaDB vector store.
+A production-ready Spring Boot application that enables intelligent question-answering on PDF documents using Retrieval-Augmented Generation (RAG) with multi-model AI support (OpenAI, Anthropic Claude, Google Gemini) and PostgreSQL with PgVector for vector storage.
 
 ## Features
 
 - **PDF Document Upload**: Upload PDF documents up to 50MB
 - **Intelligent Text Processing**: Automatic text extraction, chunking with overlap, and embedding generation
-- **Vector Search**: ChromaDB vector store for efficient similarity search
+- **Vector Search**: PostgreSQL with PgVector extension for efficient similarity search
 - **RAG Pipeline**: Retrieval-Augmented Generation for accurate, context-based answers
+- **Multi-Model AI Support**: 
+  - OpenAI GPT-4 (primary)
+  - Anthropic Claude Sonnet 4 (fallback)
+  - Google Gemini 1.5 Pro (fallback)
+  - Automatic failover between providers
 - **Multi-Document Support**: Isolated document management for multiple users
 - **Dual Response Formats**: 
   - TEXT: Simple text responses with page citations
   - JSON: Detailed responses with source references and relevance scores
+- **Authentication & Authorization**: Spring Security with role-based access control
 - **Async Processing**: Non-blocking document processing
 - **RESTful API**: Complete CRUD operations for documents and chat
-- **Docker Support**: Easy setup with Docker Compose for PostgreSQL and ChromaDB
+- **Docker Support**: Easy setup with Docker Compose for PostgreSQL with PgVector
 
 ## Architecture
 
 ```
-┌─────────────┐
-│   Client    │
-└──────┬──────┘
-       │
-       ├─── Upload PDF
-       │         ↓
-       │    Extract Text (PDFBox)
-       │         ↓
-       │    Chunk Text (1000 chars, 200 overlap)
-       │         ↓
-       │    Generate Embeddings (OpenAI)
-       │         ↓
-       │    Store in ChromaDB + PostgreSQL
-       │
-       └─── Ask Question
-                 ↓
-            Vector Search (Top-4 chunks)
-                 ↓
-            Build Context
-                 ↓
-            GPT-4 Answer Generation
-                 ↓
-            Response (with citations)
+┌─────────────────┐
+│     Client      │
+└────────┬────────┘
+         │
+         ├─── Upload PDF
+         │         ↓
+         │    Extract Text (PDFBox)
+         │         ↓
+         │    Chunk Text (1000 chars, 200 overlap)
+         │         ↓
+         │    Generate Embeddings (OpenAI text-embedding-3-small)
+         │         ↓
+         │    Store in PostgreSQL + PgVector
+         │
+         └─── Ask Question
+                   ↓
+              Vector Search (Top-10 chunks, threshold 0.5)
+                   ↓
+              Build Context
+                   ↓
+              Multi-Model AI Answer Generation
+              (OpenAI → Claude → Gemini fallback)
+                   ↓
+              Response (with citations)
 ```
 
 ## Technology Stack
 
 - **Java 21**
 - **Spring Boot 3.5.0**
-- **Spring AI 1.0.0-M5**
-- **OpenAI GPT-4** (LLM)
+- **Spring AI 1.1.2**
+- **Spring Security** (HTTP Basic Auth)
+- **OpenAI GPT-4** (Primary LLM)
+- **Anthropic Claude Sonnet 4** (Fallback LLM)
+- **Google Gemini 1.5 Pro** (Fallback LLM)
 - **OpenAI text-embedding-3-small** (Embeddings)
-- **ChromaDB** (Vector Store)
-- **PostgreSQL 16** (Document Metadata)
+- **PostgreSQL 16 with PgVector** (Vector Store & Document Metadata)
 - **Apache PDFBox 3.0.3** (PDF Processing)
 - **Docker & Podman** (Containerization)
 
@@ -63,15 +72,16 @@ A production-ready Spring Boot application that enables intelligent question-ans
    sudo dnf install java-21-openjdk-devel
    ```
 
-2. **Docker/Podman** (for PostgreSQL and ChromaDB)
+2. **Docker/Podman** (for PostgreSQL with PgVector)
    ```bash
    # Verify installation
    docker --version  # or podman --version
    ```
 
-3. **OpenAI API Key**
-   - Sign up at https://platform.openai.com
-   - Generate an API key
+3. **API Keys** (at least one required)
+   - **OpenAI API Key**: https://platform.openai.com (required for embeddings)
+   - **Anthropic API Key**: https://console.anthropic.com (optional, for Claude fallback)
+   - **Google AI API Key**: https://aistudio.google.com (optional, for Gemini fallback)
 
 ## Quick Start
 
@@ -84,10 +94,22 @@ cd pdf-chatbot
 
 ### 2. Set Up Environment
 
-Set your OpenAI API key:
+Create a `.env` file or export environment variables:
 
 ```bash
-export OPENAI_API_KEY="sk-your-api-key-here"
+# Required
+export OPENAI_API_KEY="sk-your-openai-api-key"
+
+# Optional - for multi-model fallback
+export ANTHROPIC_API_KEY="sk-ant-your-anthropic-key"
+export GOOGLE_AI_API_KEY="your-google-ai-key"
+
+# Optional - Security (defaults shown)
+export SECURITY_ENABLED=true
+export ADMIN_USERNAME=admin
+export ADMIN_PASSWORD=admin123
+export USER_USERNAME=user
+export USER_PASSWORD=user123
 ```
 
 ### 3. Start Infrastructure Services
@@ -102,7 +124,7 @@ docker-compose up -d
 # Create network
 podman network create chatbot-network
 
-# Start PostgreSQL
+# Start PostgreSQL with PgVector
 podman run -d \
   --name pdf-chatbot-postgres \
   --network chatbot-network \
@@ -110,16 +132,7 @@ podman run -d \
   -e POSTGRES_USER=chatbot \
   -e POSTGRES_PASSWORD=chatbot123 \
   -p 5432:5432 \
-  docker.io/library/postgres:16-alpine
-
-# Start ChromaDB
-podman run -d \
-  --name pdf-chatbot-chroma \
-  --network chatbot-network \
-  -e ANONYMIZED_TELEMETRY=False \
-  -e ALLOW_RESET=True \
-  -p 8000:8000 \
-  docker.io/chromadb/chroma:latest
+  pgvector/pgvector:pg16
 ```
 
 Verify services are running:
@@ -143,6 +156,20 @@ podman ps
 
 The application will start on `http://localhost:8080`
 
+## Authentication
+
+The API uses HTTP Basic Authentication. Default credentials:
+
+| Role | Username | Password | Permissions |
+|------|----------|----------|-------------|
+| Admin | admin | admin123 | Full access (CRUD + Delete) |
+| User | user | user123 | Read + Create (no Delete) |
+
+To disable authentication for development:
+```bash
+export SECURITY_ENABLED=false
+```
+
 ## API Endpoints
 
 ### Document Management
@@ -150,6 +177,7 @@ The application will start on `http://localhost:8080`
 #### 1. Upload Document
 ```bash
 curl -X POST http://localhost:8080/api/documents/upload \
+  -u admin:admin123 \
   -F "file=@/path/to/document.pdf"
 ```
 
@@ -166,7 +194,8 @@ curl -X POST http://localhost:8080/api/documents/upload \
 
 #### 2. Check Document Status
 ```bash
-curl http://localhost:8080/api/documents/{documentId}/status
+curl http://localhost:8080/api/documents/{documentId}/status \
+  -u user:user123
 ```
 
 **Response:**
@@ -185,7 +214,8 @@ curl http://localhost:8080/api/documents/{documentId}/status
 
 #### 3. List All Documents
 ```bash
-curl http://localhost:8080/api/documents
+curl http://localhost:8080/api/documents \
+  -u user:user123
 ```
 
 **Response:**
@@ -204,9 +234,10 @@ curl http://localhost:8080/api/documents
 }
 ```
 
-#### 4. Delete Document
+#### 4. Delete Document (Admin only)
 ```bash
-curl -X DELETE http://localhost:8080/api/documents/{documentId}
+curl -X DELETE http://localhost:8080/api/documents/{documentId} \
+  -u admin:admin123
 ```
 
 ### Chat / Question Answering
@@ -214,6 +245,7 @@ curl -X DELETE http://localhost:8080/api/documents/{documentId}
 #### 1. Ask Question (TEXT Format)
 ```bash
 curl -X POST http://localhost:8080/api/chat \
+  -u user:user123 \
   -H "Content-Type: application/json" \
   -d '{
     "documentId": "550e8400-e29b-41d4-a716-446655440000",
@@ -235,6 +267,7 @@ curl -X POST http://localhost:8080/api/chat \
 #### 2. Ask Question (JSON Format with Sources)
 ```bash
 curl -X POST http://localhost:8080/api/chat \
+  -u user:user123 \
   -H "Content-Type: application/json" \
   -d '{
     "documentId": "550e8400-e29b-41d4-a716-446655440000",
@@ -264,6 +297,21 @@ curl -X POST http://localhost:8080/api/chat \
 }
 ```
 
+#### 3. Check AI Model Status
+```bash
+curl http://localhost:8080/api/chat/models \
+  -u user:user123
+```
+
+**Response:**
+```json
+{
+  "activeProvider": "OpenAI (GPT-4)",
+  "availableProviders": ["OpenAI (GPT-4)", "Anthropic (Claude)", "Google (Gemini)"],
+  "totalAvailable": 3
+}
+```
+
 ## Configuration
 
 ### application.properties
@@ -271,19 +319,37 @@ curl -X POST http://localhost:8080/api/chat \
 Key configuration options:
 
 ```properties
+# Security
+app.security.enabled=true
+app.security.admin.username=admin
+app.security.admin.password=admin123
+
 # Database
 spring.datasource.url=jdbc:postgresql://localhost:5432/pdfchatbot
 spring.datasource.username=chatbot
 spring.datasource.password=chatbot123
+
+# Multi-Model AI
+app.ai.primary-provider=openai
+app.ai.fallback-order=openai,anthropic,gemini
 
 # OpenAI
 spring.ai.openai.api-key=${OPENAI_API_KEY}
 spring.ai.openai.chat.options.model=gpt-4-turbo-preview
 spring.ai.openai.chat.options.temperature=0.3
 
-# ChromaDB
-spring.ai.vectorstore.chroma.client.host=localhost
-spring.ai.vectorstore.chroma.client.port=8000
+# Anthropic (Claude)
+spring.ai.anthropic.api-key=${ANTHROPIC_API_KEY}
+spring.ai.anthropic.chat.options.model=claude-sonnet-4-20250514
+
+# Google Gemini
+app.ai.gemini.api-key=${GOOGLE_AI_API_KEY}
+app.ai.gemini.model=gemini-1.5-pro
+
+# PgVector
+spring.ai.vectorstore.pgvector.index-type=HNSW
+spring.ai.vectorstore.pgvector.distance-type=COSINE_DISTANCE
+spring.ai.vectorstore.pgvector.dimensions=1536
 
 # File Upload
 spring.servlet.multipart.max-file-size=50MB
@@ -292,8 +358,8 @@ spring.servlet.multipart.max-request-size=50MB
 # RAG Configuration
 app.rag.chunk-size=1000
 app.rag.chunk-overlap=200
-app.rag.top-k=4
-app.rag.similarity-threshold=0.7
+app.rag.top-k=10
+app.rag.similarity-threshold=0.5
 ```
 
 ## RAG Configuration Best Practices
@@ -309,14 +375,14 @@ app.rag.similarity-threshold=0.7
 - Increases slightly with chunk size
 
 ### Top-K Retrieval
-- **Current: 4 chunks**
+- **Current: 10 chunks**
 - Balance between context and token limits
 - Increase for complex questions
 
 ### Similarity Threshold
-- **Current: 0.7**
+- **Current: 0.5**
 - Filters irrelevant results
-- Lower for broader matches
+- Lower for broader matches, higher for precision
 
 ## Project Structure
 
@@ -325,18 +391,23 @@ src/main/java/com/surya/pdfchatbot/
 ├── PdfChatbotApplication.java
 ├── config/
 │   ├── FileStorageConfig.java
-│   └── RagConfig.java
+│   ├── MultiModelConfig.java
+│   ├── RagConfig.java
+│   └── SecurityConfig.java
 ├── controller/
 │   ├── DocumentController.java
 │   └── ChatController.java
 ├── service/
 │   ├── DocumentService.java
+│   ├── DocumentProcessingService.java
 │   ├── FileStorageService.java
 │   ├── PdfProcessingService.java
 │   ├── ChunkingService.java
 │   ├── EmbeddingService.java
-│   └── ChatService.java
+│   ├── ChatService.java
+│   └── MultiModelChatService.java
 ├── model/
+│   ├── ModelProvider.java
 │   ├── entity/
 │   │   └── Document.java
 │   └── dto/
@@ -376,16 +447,10 @@ java -jar target/pdfchatbot-0.0.1-SNAPSHOT.jar
 
 ## Troubleshooting
 
-### Issue: "Failed to connect to ChromaDB"
-**Solution:** Ensure ChromaDB container is running:
-```bash
-podman ps | grep chroma  # or docker ps
-```
-
 ### Issue: "Failed to connect to database"
-**Solution:** Verify PostgreSQL is running and credentials are correct:
+**Solution:** Verify PostgreSQL with PgVector is running:
 ```bash
-podman ps | grep postgres
+docker ps | grep postgres
 ```
 
 ### Issue: "OpenAI API error"
@@ -394,6 +459,12 @@ podman ps | grep postgres
 - Check API key has sufficient credits
 - Ensure you're using the correct model name
 
+### Issue: "Authentication failed"
+**Solution:**
+- Verify you're using correct credentials
+- Check if security is enabled: `app.security.enabled`
+- Use `-u username:password` with curl
+
 ### Issue: "Java compiler not found"
 **Solution:** Install JDK (not just JRE):
 ```bash
@@ -401,25 +472,37 @@ sudo dnf install java-21-openjdk-devel
 javac -version  # Verify installation
 ```
 
+### Issue: "All AI models unavailable"
+**Solution:**
+- Verify at least one API key is configured
+- Check the `/api/chat/models` endpoint for available providers
+- Review logs for specific provider errors
+
 ## Performance Considerations
 
 - **Async Processing**: Document processing happens asynchronously to avoid blocking API requests
 - **Chunking Strategy**: Smart sentence-boundary splitting preserves context
-- **Vector Search**: ChromaDB provides fast similarity search even with large document collections
-- **Token Management**: Top-K limits prevent exceeding GPT-4 context windows
+- **Vector Search**: PgVector with HNSW index provides fast similarity search even with large document collections
+- **Token Management**: Top-K limits prevent exceeding model context windows
+- **Multi-Model Fallback**: Automatic failover ensures high availability
 
-## Security Notes
+## Security Features
 
-⚠️ **Important Security Considerations:**
-
-1. **Authentication**: This version does not include authentication. Add Spring Security before production deployment.
-2. **API Keys**: Never commit API keys to version control. Use environment variables.
-3. **Input Validation**: File size and format validation is implemented, but consider additional security measures for production.
-4. **Rate Limiting**: Consider adding rate limiting for production use.
+- **HTTP Basic Authentication**: Configurable username/password authentication
+- **Role-Based Access Control**: 
+  - USER role: Read and create operations
+  - ADMIN role: Full access including delete operations
+- **File Upload Security**:
+  - Path traversal protection
+  - Filename sanitization
+  - PDF-only file type validation
+  - File size limits (50MB)
+- **Stateless Sessions**: No server-side session storage
+- **Input Validation**: Jakarta Bean Validation on all DTOs
 
 ## Future Enhancements
 
-- [ ] Add user authentication and authorization
+- [ ] JWT token-based authentication
 - [ ] Implement conversation history/memory
 - [ ] Support for multiple file formats (DOCX, TXT, etc.)
 - [ ] Streaming responses via Server-Sent Events (SSE)
@@ -427,6 +510,7 @@ javac -version  # Verify installation
 - [ ] Automatic document summarization
 - [ ] Redis caching for frequently asked questions
 - [ ] Kubernetes deployment manifests
+- [ ] Rate limiting for API endpoints
 
 ## License
 
@@ -446,5 +530,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 - [Spring AI](https://spring.io/projects/spring-ai) for AI integration framework
 - [OpenAI](https://openai.com) for GPT-4 and embedding models
-- [ChromaDB](https://www.trychroma.com/) for vector database
+- [Anthropic](https://www.anthropic.com/) for Claude models
+- [Google AI](https://ai.google.dev/) for Gemini models
+- [PgVector](https://github.com/pgvector/pgvector) for vector database extension
 - [Apache PDFBox](https://pdfbox.apache.org/) for PDF processing
