@@ -12,6 +12,7 @@ import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -117,10 +118,43 @@ public class MultiModelChatService {
         }
 
         // All providers failed
-        String errorMsg = "All AI providers failed. Last error: " + 
+        String errorMsg = "All AI providers failed. Last error: " +
                 (lastException != null ? lastException.getMessage() : "Unknown error");
         log.error(errorMsg);
         throw new ModelUnavailableException(errorMsg, lastException);
+    }
+
+    public Flux<String> streamChat(String promptText) {
+        List<ModelProvider> providersToTry = getProvidersInOrder();
+
+        if (providersToTry.isEmpty()) {
+            return Flux.error(new ModelUnavailableException(
+                    "No AI models are available. Please configure at least one API key."));
+        }
+
+        Exception lastException = null;
+
+        for (ModelProvider provider : providersToTry) {
+            if (!availableModels.containsKey(provider)) {
+                log.debug("Skipping {} - model not configured", provider.getDisplayName());
+                continue;
+            }
+
+            try {
+                log.debug("Attempting to use {} for streaming chat", provider.getDisplayName());
+                Flux<String> response = callModelStream(provider, promptText);
+                log.info("Successfully started streaming response using {}", provider.getDisplayName());
+                return response;
+            } catch (Exception e) {
+                log.warn("Failed to stream response from {}: {}", provider.getDisplayName(), e.getMessage());
+                lastException = e;
+            }
+        }
+
+        String errorMsg = "All AI providers failed. Last error: " +
+                (lastException != null ? lastException.getMessage() : "Unknown error");
+        log.error(errorMsg);
+        return Flux.error(new ModelUnavailableException(errorMsg, lastException));
     }
 
     /**
@@ -159,6 +193,23 @@ public class MultiModelChatService {
         }
 
         return response.getResult().getOutput().getText();
+    }
+
+    private Flux<String> callModelStream(ModelProvider provider, String promptText) {
+        ChatModel model = availableModels.get(provider);
+        Prompt prompt = createPromptWithOptions(provider, promptText);
+
+        try {
+            return model.stream(prompt)
+                    .map(response -> {
+                        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+                            return "";
+                        }
+                        return response.getResult().getOutput().getText();
+                    });
+        } catch (Exception e) {
+            throw new RuntimeException("Streaming failed for " + provider.getDisplayName(), e);
+        }
     }
 
     private Prompt createPromptWithOptions(ModelProvider provider, String promptText) {

@@ -15,6 +15,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,17 @@ public class ChatService {
             6. Do not make assumptions or add information not present in the context
             
             When you provide an answer, reference the page numbers like this: (Page X).
+            """;
+
+    private static final String PROMPT_TEMPLATE = """
+            {system_prompt}
+            
+            Context:
+            {context}
+            
+            Question: {question}
+            
+            Answer:
             """;
 
     private final MultiModelChatService multiModelChatService;
@@ -69,13 +81,9 @@ public class ChatService {
         }
 
         try {
-            // Retrieve relevant chunks using vector similarity search
-            List<RetrievedChunk> relevantChunks = retrieveRelevantChunks(
-                    request.documentId(),
-                    request.question()
-            );
+            ChatContext chatContext = buildChatContext(request.documentId(), request.question());
 
-            if (relevantChunks.isEmpty()) {
+            if (chatContext.relevantChunks().isEmpty()) {
                 return new ChatResponse(
                         "I cannot find relevant information in the document to answer your question.",
                         request.responseFormat().toString(),
@@ -84,21 +92,33 @@ public class ChatService {
                 );
             }
 
-            // Build context from relevant chunks
-            String context = buildContext(relevantChunks);
-
             // Generate answer using LLM
-            String answer = generateAnswer(request.question(), context);
+            String answer = generateAnswer(request.question(), chatContext.context());
 
             // Prepare sources for JSON response
             List<SourceReference> sources = request.responseFormat() == ChatRequest.ResponseFormat.JSON ?
-                    buildSourceReferences(relevantChunks) : null;
+                    buildSourceReferences(chatContext.relevantChunks()) : null;
 
             return new ChatResponse(answer, request.responseFormat().toString(), request.documentId(), sources);
 
         } catch (Exception e) {
             log.error("Error processing chat request", e);
             throw new DocumentProcessingException("Failed to process question: " + e.getMessage(), e);
+        }
+    }
+
+    public Flux<String> chatStream(ChatRequest request) {
+        try {
+            ChatContext chatContext = buildChatContext(request.documentId(), request.question());
+
+            if (chatContext.relevantChunks().isEmpty()) {
+                return Flux.just("I cannot find relevant information in the document to answer your question.");
+            }
+
+            return generateAnswerStream(request.question(), chatContext.context());
+        } catch (Exception e) {
+            log.error("Error processing streaming chat request", e);
+            return Flux.error(new DocumentProcessingException("Failed to process question: " + e.getMessage(), e));
         }
     }
 
@@ -185,21 +205,7 @@ public class ChatService {
      * Generate answer using LLM with RAG context (with multi-model fallback support)
      */
     private String generateAnswer(String question, String context) {
-        String promptText = """
-                {system_prompt}
-                
-                Context:
-                {context}
-                
-                Question: {question}
-                
-                Answer:
-                """;
-
-        PromptTemplate promptTemplate = new PromptTemplate(promptText);
-        promptTemplate.add("system_prompt", SYSTEM_PROMPT);
-        promptTemplate.add("context", context);
-        promptTemplate.add("question", question);
+        PromptTemplate promptTemplate = createPromptTemplate(question, context);
 
         try {
             String response = multiModelChatService.chat(promptTemplate.render());
@@ -208,6 +214,45 @@ public class ChatService {
             log.error("All AI models failed to generate response", e);
             throw new DocumentProcessingException("Failed to generate answer: " + e.getMessage(), e);
         }
+    }
+
+    private Flux<String> generateAnswerStream(String question, String context) {
+        PromptTemplate promptTemplate = createPromptTemplate(question, context);
+
+        try {
+            return multiModelChatService.streamChat(promptTemplate.render())
+                    .map(chunk -> chunk == null ? "" : chunk);
+        } catch (MultiModelChatService.ModelUnavailableException e) {
+            log.error("All AI models failed to stream response", e);
+            return Flux.error(new DocumentProcessingException("Failed to generate answer: " + e.getMessage(), e));
+        }
+    }
+
+    private PromptTemplate createPromptTemplate(String question, String context) {
+        PromptTemplate promptTemplate = new PromptTemplate(PROMPT_TEMPLATE);
+        promptTemplate.add("system_prompt", SYSTEM_PROMPT);
+        promptTemplate.add("context", context);
+        promptTemplate.add("question", question);
+        return promptTemplate;
+    }
+
+    private ChatContext buildChatContext(String documentId, String question) {
+        // Validate document exists and is ready
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new DocumentNotFoundException("Document not found: " + documentId));
+
+        if (document.getProcessingStatus() != Document.ProcessingStatus.READY) {
+            throw new DocumentProcessingException("Document is not ready for querying. Status: " +
+                    document.getProcessingStatus());
+        }
+
+        // Retrieve relevant chunks using vector similarity search
+        List<RetrievedChunk> relevantChunks = retrieveRelevantChunks(documentId, question);
+
+        // Build context from relevant chunks
+        String context = buildContext(relevantChunks);
+
+        return new ChatContext(relevantChunks, context);
     }
 
     /**
@@ -237,5 +282,10 @@ public class ChatService {
             int pageNumber,
             int chunkIndex,
             double relevanceScore
+    ) {}
+
+    private record ChatContext(
+            List<RetrievedChunk> relevantChunks,
+            String context
     ) {}
 }
