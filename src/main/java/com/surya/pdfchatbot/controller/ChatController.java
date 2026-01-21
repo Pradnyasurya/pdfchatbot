@@ -3,6 +3,7 @@ package com.surya.pdfchatbot.controller;
 import com.surya.pdfchatbot.model.ModelProvider;
 import com.surya.pdfchatbot.model.dto.ChatRequest;
 import com.surya.pdfchatbot.model.dto.ChatResponse;
+import com.surya.pdfchatbot.model.entity.AppUser;
 import com.surya.pdfchatbot.service.ChatService;
 import com.surya.pdfchatbot.service.MultiModelChatService;
 import jakarta.validation.Valid;
@@ -10,11 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -34,11 +35,12 @@ public class ChatController {
      * Ask a question about the document
      */
     @PostMapping
-    public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
+    public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request,
+                                             @AuthenticationPrincipal AppUser user) {
         log.info("Received chat request for document: {} with question: {}",
                 request.documentId(), request.question());
 
-        ChatResponse response = chatService.chat(request);
+        ChatResponse response = chatService.chat(request, user);
 
         log.info("Generated response in {} format", request.responseFormat());
 
@@ -49,11 +51,12 @@ public class ChatController {
      * Stream a response for a chat request
      */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> streamChat(@Valid @RequestBody ChatRequest request) {
+    public Flux<String> streamChat(@Valid @RequestBody ChatRequest request,
+                                   @AuthenticationPrincipal AppUser user) {
         log.info("Received streaming chat request for document: {} with question: {}",
                 request.documentId(), request.question());
 
-        return chatService.chatStream(request)
+        return chatService.chatStream(request, user)
                 .doFinally(signalType -> log.info("Streaming chat request completed with signal: {}", signalType));
     }
 

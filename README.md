@@ -17,7 +17,9 @@ A production-ready Spring Boot application that enables intelligent question-ans
 - **Dual Response Formats**: 
   - TEXT: Simple text responses with page citations
   - JSON: Detailed responses with source references and relevance scores
-- **Authentication & Authorization**: Spring Security with role-based access control
+- **Authentication & Authorization**: JWT login with role-based access control
+- **Chat History**: Per-user chat logs with pagination
+- **Streaming Responses**: Server-Sent Events (SSE) for incremental answers
 - **Async Processing**: Non-blocking document processing
 - **RESTful API**: Complete CRUD operations for documents and chat
 - **Docker Support**: Easy setup with Docker Compose for PostgreSQL with PgVector
@@ -56,7 +58,7 @@ A production-ready Spring Boot application that enables intelligent question-ans
 - **Java 21**
 - **Spring Boot 3.5.0**
 - **Spring AI 1.1.2**
-- **Spring Security** (HTTP Basic Auth)
+- **Spring Security** (JWT Bearer Auth)
 - **OpenAI GPT-4** (Primary LLM)
 - **Anthropic Claude Sonnet 4** (Fallback LLM)
 - **Google Gemini 1.5 Pro** (Fallback LLM)
@@ -110,6 +112,8 @@ export ADMIN_USERNAME=admin
 export ADMIN_PASSWORD=admin123
 export USER_USERNAME=user
 export USER_PASSWORD=user123
+export JWT_SECRET=change-me-in-production-please-change-me
+export JWT_EXPIRATION_SECONDS=3600
 ```
 
 ### 3. Start Infrastructure Services
@@ -158,12 +162,28 @@ The application will start on `http://localhost:8080`
 
 ## Authentication
 
-The API uses HTTP Basic Authentication. Default credentials:
+The API uses JWT Bearer authentication. Login with the seeded users to obtain a token.
+
+Default credentials:
 
 | Role | Username | Password | Permissions |
 |------|----------|----------|-------------|
 | Admin | admin | admin123 | Full access (CRUD + Delete) |
 | User | user | user123 | Read + Create (no Delete) |
+
+Login and store the token:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "user", "password": "user123"}'
+```
+
+Use the token in subsequent requests:
+
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/documents
+```
 
 To disable authentication for development:
 ```bash
